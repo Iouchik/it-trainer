@@ -1,0 +1,751 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification for IT-Terminology Trainer
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: terms
+    description: Dictionary terms management
+  - name: game
+    description: Game round operations
+  - name: stats
+    description: User statistics
+  - name: logs
+    description: Admin system logs
+  - name: feedback
+    description: User feedback on terms
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # --- Auth ---
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # --- Terms ---
+  /terms:
+    get:
+      operationId: listTerms
+      tags: [terms]
+      summary: List terms (admin gets all, user/game gets only actual)
+      parameters:
+        - name: all
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of terms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Term"
+    post:
+      operationId: createTerm
+      tags: [terms]
+      summary: Create a new term (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TermInput"
+      responses:
+        "201":
+          description: Created term
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Term"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /terms/{id}:
+    get:
+      operationId: getTerm
+      tags: [terms]
+      summary: Get single term
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Term
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Term"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateTerm
+      tags: [terms]
+      summary: Update a term (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TermUpdate"
+      responses:
+        "200":
+          description: Updated term
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Term"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteTerm
+      tags: [terms]
+      summary: Delete a term (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # --- Game ---
+  /game/start:
+    post:
+      operationId: startRound
+      tags: [game]
+      summary: Start a new game round (picks a random actual term)
+      responses:
+        "200":
+          description: Round started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoundState"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /game/answer:
+    post:
+      operationId: submitAnswer
+      tags: [game]
+      summary: Submit an answer for the current active round
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnswerInput"
+      responses:
+        "200":
+          description: Answer result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnswerResult"
+        "400":
+          description: No active round or invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /game/hint:
+    post:
+      operationId: requestHint
+      tags: [game]
+      summary: Request a hint for the current active round
+      responses:
+        "200":
+          description: Hint response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HintResult"
+        "400":
+          description: No active round or hint not available yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /game/forfeit:
+    post:
+      operationId: forfeitRound
+      tags: [game]
+      summary: Forfeit (give up) the current active round
+      responses:
+        "200":
+          description: Round forfeited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoundResult"
+        "400":
+          description: No active round
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /game/current:
+    get:
+      operationId: getCurrentRound
+      tags: [game]
+      summary: Get current active round state (for session recovery)
+      responses:
+        "200":
+          description: Current round state or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoundState"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # --- Stats ---
+  /stats/me:
+    get:
+      operationId: getMyStats
+      tags: [stats]
+      summary: Get current user aggregate statistics
+      responses:
+        "200":
+          description: User stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stats/me/history:
+    get:
+      operationId: getMyRoundHistory
+      tags: [stats]
+      summary: Get last 10 rounds for history table
+      responses:
+        "200":
+          description: Round history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoundHistoryItem"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stats/me/chart:
+    get:
+      operationId: getMyChartData
+      tags: [stats]
+      summary: Get chart data (last 7 days success %)
+      responses:
+        "200":
+          description: Chart data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChartData"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # --- Logs ---
+  /logs:
+    get:
+      operationId: getLogs
+      tags: [logs]
+      summary: Get last 100 system log entries (admin only)
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogEntry"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: clearLogs
+      tags: [logs]
+      summary: Clear all logs (admin only)
+      responses:
+        "200":
+          description: Logs cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # --- Feedback ---
+  /feedback:
+    post:
+      operationId: submitFeedback
+      tags: [feedback]
+      summary: Submit feedback for a term
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackInput"
+      responses:
+        "201":
+          description: Feedback submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+        - ok
+
+    # Auth
+    RegisterInput:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 6
+
+    LoginInput:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AuthUser:
+      type: object
+      required: [id, username, email, role]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+
+    # Terms
+    Term:
+      type: object
+      required: [id, term, description, status, termLength]
+      properties:
+        id:
+          type: integer
+        term:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [actual, moderation, deprecated]
+        termLength:
+          type: integer
+        createdAt:
+          type: string
+
+    TermInput:
+      type: object
+      required: [term, description]
+      properties:
+        term:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum: [actual, moderation, deprecated]
+
+    TermUpdate:
+      type: object
+      properties:
+        term:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum: [actual, moderation, deprecated]
+
+    # Game
+    RoundState:
+      type: object
+      required: [roundId, description, attemptsLeft, attemptsTotal, hintUsed, hintAvailable]
+      properties:
+        roundId:
+          type: integer
+        description:
+          type: string
+        attemptsLeft:
+          type: integer
+        attemptsTotal:
+          type: integer
+        hintUsed:
+          type: boolean
+        hintAvailable:
+          type: boolean
+        hint:
+          type: ["string", "null"]
+
+    AnswerInput:
+      type: object
+      required: [answer]
+      properties:
+        answer:
+          type: string
+
+    AnswerResult:
+      type: object
+      required: [correct, attemptsLeft, finished, success]
+      properties:
+        correct:
+          type: boolean
+        attemptsLeft:
+          type: integer
+        finished:
+          type: boolean
+        success:
+          type: boolean
+        correctTerm:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        hintAvailable:
+          type: boolean
+
+    HintResult:
+      type: object
+      required: [hint, attemptsLeft]
+      properties:
+        hint:
+          type: string
+        attemptsLeft:
+          type: integer
+
+    RoundResult:
+      type: object
+      required: [success, correctTerm, description]
+      properties:
+        success:
+          type: boolean
+        correctTerm:
+          type: string
+        description:
+          type: string
+
+    # Stats
+    UserStats:
+      type: object
+      required: [totalRounds, successRounds, successPercent, hintsUsed, avgAttempts]
+      properties:
+        totalRounds:
+          type: integer
+        successRounds:
+          type: integer
+        successPercent:
+          type: number
+        hintsUsed:
+          type: integer
+        avgAttempts:
+          type: number
+
+    RoundHistoryItem:
+      type: object
+      required: [id, playedAt, term, success, attempts, hintUsed]
+      properties:
+        id:
+          type: integer
+        playedAt:
+          type: string
+        term:
+          type: string
+        termId:
+          type: integer
+        success:
+          type: boolean
+        attempts:
+          type: integer
+        hintUsed:
+          type: boolean
+
+    ChartData:
+      type: object
+      required: [labels, values]
+      properties:
+        labels:
+          type: array
+          items:
+            type: string
+        values:
+          type: array
+          items:
+            type: number
+
+    # Logs
+    LogEntry:
+      type: object
+      required: [id, level, message, createdAt]
+      properties:
+        id:
+          type: integer
+        level:
+          type: string
+          enum: [info, warn, error]
+        message:
+          type: string
+        createdAt:
+          type: string
+
+    # Feedback
+    FeedbackInput:
+      type: object
+      required: [termId, message]
+      properties:
+        termId:
+          type: integer
+        message:
+          type: string
+          minLength: 1

@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Веб-тренажёр IT-терминологии</title>
+    <!-- Подключение Chart.js для графиков статистики -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f3f4f6;
+            --surface: #ffffff;
+            --text: #1f2937;
+            --text-secondary: #6b7280;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --border: #e5e7eb;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh; display: flex; flex-direction: column; }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; width: 100%; flex: 1; }
+        .hidden { display: none !important; }
+        
+        /* Формы и карточки */
+        .card { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; }
+        .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; transition: border-color 0.2s; }
+        .form-control:focus { outline: none; border-color: var(--primary); }
+        
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; border: none; border-radius: 6px; font-size: 1rem; font-weight: 500; cursor: pointer; transition: background 0.2s; text-decoration: none; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-block { width: 100%; }
+
+        /* Хедер */
+        .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 0; margin-bottom: 24px; }
+        .header-content { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-links a { margin-left: 20px; color: var(--text-secondary); text-decoration: none; font-weight: 500; }
+        .nav-links a:hover { color: var(--primary); }
+        .nav-links a.active { color: var(--primary); }
+
+        /* Таблицы */
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg); font-weight: 600; color: var(--text-secondary); }
+        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+        .status-actual { background: #d1fae5; color: #065f46; }
+        .status-moderation { background: #fef3c7; color: #92400e; }
+        .status-deprecated { background: #fee2e2; color: #991b1b; }
+
+        /* Игровая зона */
+        .game-area { text-align: center; max-width: 600px; margin: 0 auto; }
+        .term-desc { font-size: 1.2rem; margin-bottom: 24px; padding: 20px; background: #eff6ff; border-left: 4px solid var(--primary); border-radius: 4px; text-align: left; }
+        .attempts-counter { font-size: 1.1rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; }
+        .hint-text { color: var(--warning); font-weight: 500; margin-top: 12px; font-size: 0.95rem; }
+        .result-box { padding: 24px; border-radius: 8px; margin-top: 20px; }
+        .result-win { background: #d1fae5; border: 1px solid var(--success); }
+        .result-lose { background: #fee2e2; border: 1px solid var(--danger); }
+
+        /* Логи */
+        .log-console { background: #1f2937; color: #10b981; font-family: 'Courier New', monospace; padding: 16px; border-radius: 6px; height: 400px; overflow-y: auto; font-size: 0.85rem; line-height: 1.4; }
+        .log-entry { margin-bottom: 4px; }
+        .log-info { color: #60a5fa; }
+        .log-warn { color: #fbbf24; }
+        .log-error { color: #f87171; }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .header-content { flex-direction: column; gap: 12px; }
+            .nav-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+            .nav-links a { margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Хедер (виден только авторизованным) -->
+    <header id="app-header" class="header hidden">
+        <div class="header-content">
+            <div style="font-weight: 700; font-size: 1.2rem; color: var(--primary);">IT-Termin Trainer</div>
+            <div class="nav-links">
+                <span id="user-greeting" style="color: var(--text-secondary); margin-right: 15px;"></span>
+                <a href="#" onclick="showView('view-main')">Игра</a>
+                <a href="#" onclick="showView('view-stats')">Моя статистика</a>
+                <a href="#" id="admin-dict-link" class="hidden" onclick="showView('view-admin-dict')">Словарь</a>
+                <a href="#" id="admin-logs-link" class="hidden" onclick="showView('view-admin-logs')">Логи</a>
+                <a href="#" onclick="logout()" style="color: var(--danger);">Выход</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- 1. Форма авторизации -->
+        <div id="view-login" class="view">
+            <div class="card" style="max-width: 400px; margin: 40px auto;">
+                <h2 style="text-align: center; margin-bottom: 24px;">Вход в систему</h2>
+                <div style="background: #eff6ff; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 0.9rem;">
+                    <strong>Гостям:</strong> Тренажёр помогает запоминать IT-термины. Для доступа к раундам необходима регистрация.
+                </div>
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label>Логин</label>
+                        <input type="text" id="login-username" class="form-control" required placeholder="Например: user">
+                    </div>
+                    <div class="form-group">
+                        <label>Пароль</label>
+                        <input type="password" id="login-password" class="form-control" required placeholder="Например: user123">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Войти</button>
+                </form>
+                <p style="text-align: center; margin-top: 16px; font-size: 0.9rem;">
+                    Нет аккаунта? <a href="#" onclick="showView('view-register')" style="color: var(--primary);">Зарегистрироваться</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- 2. Форма регистрации -->
+        <div id="view-register" class="view hidden">
+            <div class="card" style="max-width: 400px; margin: 40px auto;">
+                <h2 style="text-align: center; margin-bottom: 24px;">Регистрация</h2>
+                <form onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label>Логин</label>
+                        <input type="text" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Адрес электронной почты</label>
+                        <input type="email" class="form-control" required placeholder="example@mail.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Пароль</label>
+                        <input type="password" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Подтверждение пароля</label>
+                        <input type="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Зарегистрироваться</button>
+                </form>
+                <p style="text-align: center; margin-top: 16px; font-size: 0.9rem;">
+                    Уже есть аккаунт? <a href="#" onclick="showView('view-login')" style="color: var(--primary);">Войти</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- 3. Главный игровой экран -->
+        <div id="view-main" class="view hidden">
+            <div id="game-start-screen" class="card game-area">
+                <h2 style="margin-bottom: 16px;">Добро пожаловать, <span id="main-username"></span>!</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 24px;">Ваша текущая должность: <strong id="user-position"></strong></p>
+                <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 24px;">
+                    <div class="card" style="flex: 1; text-align: center; margin: 0;">
+                        <div style="font-size: 2rem; font-weight: 700; color: var(--primary);">45</div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);">Раундов сыграно</div>
+                    </div>
+                    <div class="card" style="flex: 1; text-align: center; margin: 0;">
+                        <div style="font-size: 2rem; font-weight: 700; color: var(--success);">75%</div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);">Успешных ответов</div>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-block" style="padding: 16px; font-size: 1.1rem;" onclick="startNewRound()">Начать новый раунд</button>
+            </div>
+
+            <div id="game-active-screen" class="card game-area hidden">
+                <div class="attempts-counter">Попыток осталось: <span id="attempts-left">0</span></div>
+                <div class="term-desc" id="term-description">Описание термина...</div>
+                
+                <div class="form-group" style="text-align: left;">
+                    <label>Ваш вариант (на английском):</label>
+                    <input type="text" id="term-input" class="form-control" placeholder="Введите термин..." autocomplete="off">
+                </div>
+                
+                <div id="hint-display" class="hint-text hidden"></div>
+                <div id="error-display" style="color: var(--danger); font-size: 0.9rem; margin-top: 8px; min-height: 20px;"></div>
+
+                <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; justify-content: center;">
+                    <button class="btn btn-primary" onclick="checkAnswer()">Проверить</button>
+                    <button class="btn btn-secondary" id="btn-hint" onclick="showHint()" disabled>Подсказка</button>
+                    <button class="btn btn-danger" onclick="giveUp()">Сдаться</button>
+                </div>
+            </div>
+
+            <div id="game-result-screen" class="card game-area hidden">
+                <h2 id="result-title" style="margin-bottom: 16px;"></h2>
+                <div class="result-box" id="result-box">
+                    <h3 id="result-term" style="margin-bottom: 8px;"></h3>
+                    <p id="result-desc" style="color: var(--text-secondary);"></p>
+                </div>
+                <button class="btn btn-primary btn-block" style="margin-top: 24px;" onclick="resetGameScreen()">Следующий раунд</button>
+            </div>
+        </div>
+
+        <!-- 4. Моя статистика -->
+        <div id="view-stats" class="view hidden">
+            <h2 style="margin-bottom: 20px;">Моя статистика</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                <div class="card" style="text-align: center; margin: 0;">
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--primary);">45</div>
+                    <div style="font-size: 0.9rem; color: var(--text-secondary);">Всего раундов</div>
+                </div>
+                <div class="card" style="text-align: center; margin: 0;">
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--success);">34</div>
+                    <div style="font-size: 0.9rem; color: var(--text-secondary);">Успешных (75%)</div>
+                </div>
+                <div class="card" style="text-align: center; margin: 0;">
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--warning);">12</div>
+                    <div style="font-size: 0.9rem; color: var(--text-secondary);">Использовано подсказок</div>
+                </div>
+                <div class="card" style="text-align: center; margin: 0;">
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--text);">2.4</div>
+                    <div style="font-size: 0.9rem; color: var(--text-secondary);">Среднее кол-во попыток</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 16px;">Динамика успехов (последние 7 дней)</h3>
+                <canvas id="statsChart" height="100"></canvas>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 16px;">История последних 10 раундов</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Дата и время</th>
+                                <th>Термин</th>
+                                <th>Результат</th>
+                                <th>Попыток</th>
+                                <th>Подсказка</th>
+                                <th>Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stats-table-body">
+                            <!-- Заполняется JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Управление словарём (Админ) -->
+        <div id="view-admin-dict" class="view hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Управление словарём</h2>
+                <button class="btn btn-primary" onclick="openModal('modal-add-term')">Добавить термин</button>
+            </div>
+            <div class="card">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Термин (англ.)</th>
+                                <th>Описание (рус.)</th>
+                                <th>Длина</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dict-table-body">
+                            <!-- Заполняется JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. Системные логи (Админ) -->
+        <div id="view-admin-logs" class="view hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Системные логи</h2>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" onclick="renderLogs()">Обновить</button>
+                    <button class="btn btn-danger" onclick="alert('Логи очищены (визуально)')">Очистить</button>
+                </div>
+            </div>
+            <div class="log-console" id="log-console">
+                <!-- Заполняется JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Добавление/Редактирование термина -->
+    <div id="modal-add-term" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100;">
+        <div class="card" style="width: 100%; max-width: 500px; margin: 0;">
+            <h3 style="margin-bottom: 16px;">Добавить новый термин</h3>
+            <div class="form-group">
+                <label>Термин (на английском)</label>
+                <input type="text" class="form-control" id="new-term-text">
+            </div>
+            <div class="form-group">
+                <label>Описание (на русском)</label>
+                <textarea class="form-control" rows="3" id="new-term-desc"></textarea>
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeModal('modal-add-term')">Отмена</button>
+                <button class="btn btn-primary" onclick="saveTerm()">Сохранить (На модерации)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Отзыв -->
+    <div id="modal-feedback" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100;">
+        <div class="card" style="width: 100%; max-width: 500px; margin: 0;">
+            <h3 style="margin-bottom: 16px;">Отправить отзыв о термине</h3>
+            <p style="margin-bottom: 12px; color: var(--text-secondary);">Термин: <strong id="feedback-term-name"></strong></p>
+            <div class="form-group">
+                <label>Текст замечания</label>
+                <textarea class="form-control" rows="4" placeholder="Опишите некорректность описания..."></textarea>
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeModal('modal-feedback')">Отмена</button>
+                <button class="btn btn-primary" onclick="closeModal('modal-feedback'); alert('Отзыв отправлен администратору!')">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- MOCK DATA (Имитация базы данных) ---
+        const USERS = [
+            { username: 'admin', password: 'admin123', role: 'admin', name: 'Петров А.С.', position: 'Lead System Administrator' },
+            { username: 'user', password: 'user123', role: 'user', name: 'Иванов И.И.', position: 'Junior Frontend Developer' }
+        ];
+
+        const TERMS = [
+            { id: 1, term: 'API', desc: 'Интерфейс программирования приложений, набор готовых классов, процедур или функций.', status: 'actual' },
+            { id: 2, term: 'Deployment', desc: 'Процесс перевода программного обеспечения из состояния разработки в состояние эксплуатации.', status: 'actual' },
+            { id: 3, term: 'Refactoring', desc: 'Процесс изменения внутренней структуры программы без изменения её внешнего поведения.', status: 'moderation' },
+            { id: 4, term: 'Backend', desc: 'Серверная часть приложения, отвечающая за логику, базы данных и взаимодействие с фронтендом.', status: 'actual' },
+            { id: 5, term: 'Legacy', desc: 'Устаревшее программное обеспечение или код, который всё ещё используется в системе.', status: 'deprecated' },
+            { id: 6, term: 'Framework', desc: 'Программная платформа, определяющая структуру программной системы и задающая способы взаимодействия её компонентов.', status: 'actual' }
+        ];
+
+        const STATS_HISTORY = [
+            { date: '25.05.2026 14:30', term: 'API', success: true, attempts: 1, hint: false },
+            { date: '26.05.2026 09:15', term: 'Deployment', success: true, attempts: 2, hint: false },
+            { date: '28.05.2026 16:45', term: 'Refactoring', success: false, attempts: 3, hint: true },
+            { date: '02.06.2026 11:20', term: 'Backend', success: true, attempts: 1, hint: false },
+            { date: '05.06.2026 10:05', term: 'Legacy', success: true, attempts: 2, hint: false },
+            { date: '10.06.2026 15:30', term: 'Framework', success: false, attempts: 4, hint: true },
+            { date: '12.06.2026 09:00', term: 'API', success: true, attempts: 1, hint: false },
+            { date: '15.06.2026 14:15', term: 'Deployment', success: true, attempts: 3, hint: true },
+            { date: '18.06.2026 11:45', term: 'Backend', success: true, attempts: 1, hint: false },
+            { date: '20.06.2026 16:00', term: 'Refactoring', success: true, attempts: 2, hint: false }
+        ];
+
+        const LOGS = [
+            { time: '20.05.2026 08:00:01', level: 'INFO', msg: 'System startup completed successfully.' },
+            { time: '20.05.2026 08:05:12', level: 'INFO', msg: 'User "user" logged in.' },
+            { time: '21.05.2026 10:23:45', level: 'WARN', msg: 'Invalid attempt format for term "API" (User: user).' },
+            { time: '22.05.2026 14:11:00', level: 'INFO', msg: 'Term ID 3 status changed to "moderation" by admin.' },
+            { time: '25.05.2026 09:30:22', level: 'ERROR', msg: 'Database connection timeout (recovered in 200ms).' },
+            { time: '01.06.2026 11:15:33', level: 'INFO', msg: 'New feedback received for term "Legacy".' },
+            { time: '15.06.2026 16:45:10', level: 'WARN', msg: 'Rate limit exceeded for IP 192.168.1.45.' }
+        ];
+
+        // --- STATE MANAGEMENT ---
+        let currentUser = null;
+        let currentRound = {
+            term: null,
+            attemptsLeft: 0,
+            fails: 0,
+            hintUsed: false
+        };
+
+        // --- NAVIGATION ---
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(el => el.classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+            
+            if (viewId === 'view-stats') renderStats();
+            if (viewId === 'view-admin-dict') renderDictionary();
+            if (viewId === 'view-admin-logs') renderLogs();
+        }
+
+        // --- AUTHENTICATION ---
+        function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            const user = USERS.find(u => u.username === username && u.password === password);
+            
+            if (user) {
+                currentUser = user;
+                document.getElementById('app-header').classList.remove('hidden');
+                document.getElementById('user-greeting').textContent = `${user.name} (${user.position})`;
+                document.getElementById('main-username').textContent = user.name;
+                document.getElementById('user-position').textContent = user.position;
+                
+                if (user.role === 'admin') {
+                    document.getElementById('admin-dict-link').classList.remove('hidden');
+                    document.getElementById('admin-logs-link').classList.remove('hidden');
+                }
+                
+                showView('view-main');
+                resetGameScreen();
+            } else {
+                alert('Неверный логин или пароль!');
+            }
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
+            alert('Регистрация успешна! Выполняется автоматический вход...');
+            // Имитация автоматического входа
+            document.getElementById('login-username').value = 'newuser';
+            document.getElementById('login-password').value = '123';
+            handleLogin(e);
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('app-header').classList.add('hidden');
+            document.getElementById('admin-dict-link').classList.add('hidden');
+            document.getElementById('admin-logs-link').classList.add('hidden');
+            document.getElementById('login-username').value = '';
+            document.getElementById('login-password').value = '';
+            showView('view-login');
+        }
+
+        // --- GAME LOGIC ---
+        function startNewRound() {
+            const availableTerms = TERMS.filter(t => t.status === 'actual');
+            const randomTerm = availableTerms[Math.floor(Math.random() * availableTerms.length)];
+            
+            // Длина термина определяет попытки (мин 3, макс 8)
+            const length = randomTerm.term.length;
+            const attempts = Math.max(3, Math.min(8, length));
+
+            currentRound = {
+                term: randomTerm,
+                attemptsLeft: attempts,
+                fails: 0,
+                hintUsed: false
+            };
+
+            document.getElementById('game-start-screen').classList.add('hidden');
+            document.getElementById('game-result-screen').classList.add('hidden');
+            document.getElementById('game-active-screen').classList.remove('hidden');
+            
+            document.getElementById('term-description').textContent = randomTerm.desc;
+            document.getElementById('attempts-left').textContent = currentRound.attemptsLeft;
+            document.getElementById('term-input').value = '';
+            document.getElementById('hint-display').classList.add('hidden');
+            document.getElementById('error-display').textContent = '';
+            document.getElementById('btn-hint').disabled = true;
+            document.getElementById('term-input').focus();
+        }
+
+        function checkAnswer() {
+            const input = document.getElementById('term-input').value.trim().toLowerCase();
+            const correct = currentRound.term.term.toLowerCase();
+            const errorDisplay = document.getElementById('error-display');
+
+            if (!input) {
+                errorDisplay.textContent = 'Введите вариант ответа!';
+                return;
+            }
+
+            if (input === correct) {
+                endRound(true);
+            } else {
+                currentRound.fails++;
+                currentRound.attemptsLeft--;
+                document.getElementById('attempts-left').textContent = currentRound.attemptsLeft;
+                errorDisplay.textContent = 'Неверно. Попробуйте ещё раз.';
+                
+                if (currentRound.fails >= 2) {
+                    document.getElementById('btn-hint').disabled = false;
+                }
+
+                if (currentRound.attemptsLeft <= 0) {
+                    endRound(false);
+                }
+            }
+        }
+
+        function showHint() {
+            const term = currentRound.term.term;
+            document.getElementById('hint-display').textContent = `Подсказка: термин начинается на букву "${term[0]}" и содержит ${term.length} символов.`;
+            document.getElementById('hint-display').classList.remove('hidden');
+            currentRound.hintUsed = true;
+            document.getElementById('btn-hint').disabled = true;
+        }
+
+        function giveUp() {
+            endRound(false);
+        }
+
+        function endRound(isWin) {
+            document.getElementById('game-active-screen').classList.add('hidden');
+            document.getElementById('game-result-screen').classList.remove('hidden');
+            
+            const title = document.getElementById('result-title');
+            const box = document.getElementById('result-box');
+            const termEl = document.getElementById('result-term');
+            const descEl = document.getElementById('result-desc');
+
+            termEl.textContent = currentRound.term.term;
+            descEl.textContent = currentRound.term.desc;
+
+            if (isWin) {
+                title.textContent = 'Раунд завершён успешно!';
+                title.style.color = 'var(--success)';
+                box.className = 'result-box result-win';
+            } else {
+                title.textContent = 'Раунд завершён. Правильный ответ:';
+                title.style.color = 'var(--danger)';
+                box.className = 'result-box result-lose';
+            }
+        }
+
+        function resetGameScreen() {
+            document.getElementById('game-active-screen').classList.add('hidden');
+            document.getElementById('game-result-screen').classList.add('hidden');
+            document.getElementById('game-start-screen').classList.remove('hidden');
+        }
+
+        // --- STATS & CHART ---
+        function renderStats() {
+            const tbody = document.getElementById('stats-table-body');
+            tbody.innerHTML = '';
+            
+            STATS_HISTORY.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.date}</td>
+                    <td><strong>${row.term}</strong></td>
+                    <td><span style="color: ${row.success ? 'var(--success)' : 'var(--danger)'}; font-weight: 600;">${row.success ? 'Успех' : 'Неудача'}</span></td>
+                    <td>${row.attempts}</td>
+                    <td>${row.hint ? 'Да' : 'Нет'}</td>
+                    <td><button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="openFeedback('${row.term}')">Отзыв</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Инициализация Chart.js
+            const ctx = document.getElementById('statsChart').getContext('2d');
+            if (window.myChart) window.myChart.destroy();
+            
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['20.05', '25.05', '01.06', '05.06', '10.06', '15.06', '20.06'],
+                    datasets: [{
+                        label: 'Процент успеха (%)',
+                        data: [50, 60, 65, 70, 68, 75, 80],
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true, max: 100 } }
+                }
+            });
+        }
+
+        // --- ADMIN FUNCTIONS ---
+        function renderDictionary() {
+            const tbody = document.getElementById('dict-table-body');
+            tbody.innerHTML = '';
+            
+            TERMS.forEach(t => {
+                let statusClass = '';
+                let statusText = '';
+                if (t.status === 'actual') { statusClass = 'status-actual'; statusText = 'Актуален'; }
+                else if (t.status === 'moderation') { statusClass = 'status-moderation'; statusText = 'На модерации'; }
+                else { statusClass = 'status-deprecated'; statusText = 'Устарел'; }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${t.id}</td>
+                    <td><strong>${t.term}</strong></td>
+                    <td>${t.desc}</td>
+                    <td>${t.term.length}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="alert('Редактирование ID ${t.id}')">Изм.</button>
+                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="deleteTerm(${t.id})">Удалить</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function saveTerm() {
+            const text = document.getElementById('new-term-text').value;
+            const desc = document.getElementById('new-term-desc').value;
+            if (text && desc) {
+                TERMS.push({
+                    id: TERMS.length + 1,
+                    term: text,
+                    desc: desc,
+                    status: 'moderation'
+                });
+                closeModal('modal-add-term');
+                renderDictionary();
+                alert('Термин добавлен в статусе "На модерации"');
+            }
+        }
+
+        function deleteTerm(id) {
+            if (confirm('Вы уверены, что хотите удалить этот термин?')) {
+                const idx = TERMS.findIndex(t => t.id === id);
+                if (idx > -1) TERMS.splice(idx, 1);
+                renderDictionary();
+            }
+        }
+
+        function renderLogs() {
+            const consoleEl = document.getElementById('log-console');
+            consoleEl.innerHTML = '';
+            LOGS.forEach(log => {
+                const div = document.createElement('div');
+                div.className = 'log-entry';
+                let levelClass = 'log-info';
+                if (log.level === 'WARN') levelClass = 'log-warn';
+                if (log.level === 'ERROR') levelClass = 'log-error';
+                
+                div.innerHTML = `<span style="color: #9ca3af;">[${log.time}]</span> <span class="${levelClass}">[${log.level}]</span> ${log.msg}`;
+                consoleEl.appendChild(div);
+            });
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        // --- MODALS ---
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).style.display = 'flex';
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).style.display = 'none';
+        }
+        function openFeedback(termName) {
+            document.getElementById('feedback-term-name').textContent = termName;
+            openModal('modal-feedback');
+        }
+
+        // Инициализация при загрузке
+        showView('view-login');
+    </script>
+</body>
+</html>
